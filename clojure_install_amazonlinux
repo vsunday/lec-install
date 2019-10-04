@@ -1,0 +1,32 @@
+#!/bin/bash -x
+# This file can be used as a bootstrap script
+yum update -y
+yum install -y java-1.8.0 emacs
+
+# leiningen
+export BIN=/home/ec2-user/bin
+export LEIN=$BIN/lein
+mkdir $BIN && \
+  wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein -P $BIN &&\
+  chown ec2-user:ec2-user $LEIN && \
+  chmod a+x $LEIN && \
+  lein
+
+# emacs config
+wget https://github.com/flyingmachine/emacs-for-clojure/archive/book1.zip -P /tmp && \
+  unzip /tmp/book1.zip -d /home/ec2-user && \
+  mv /home/ec2-user/emacs-for-clojure-book1 /home/ec2-user/.emacs.d && \
+  chown ec2-user:ec2-user -R /home/ec2-user/.emacs.d
+
+# walk around for cider bad build
+# see https://github.com/clojure-emacs/cider/issues/2619
+#export HOME=/home/ec2-user
+#mkdir HOME/.lein
+#echo {:user {:plugins [[cider/cider-nrepl "0.21.2-SNAPSHOT"]]}}> $HOME/.lein/profiles.clj
+
+# afterwards, 
+# 1. install leiningen (lein)
+# 2. open emacs
+# 3. install cider package (M-x package-install cider)
+# 4. update packages (M-x list-package U x y)
+# Also see https://github.com/flyingmachine/emacs-for-clojure/issues/43

@@ -1,0 +1,16 @@
+#!/bin/bash
+sudo apt-get update -y
+
+# java, emacs, unzip leinenen
+sudo apt-get install -y openjdk-8-jdk openjdk-8-jre emacs unzip leiningen
+
+# emacs config
+wget https://github.com/flyingmachine/emacs-for-clojure/archive/book1.zip -P /tmp && \
+  unzip /tmp/book1.zip -d /home/ubuntu && \
+  mv /home/ubuntu/emacs-for-clojure-book1 /home/ubuntu/.emacs.d
+
+# afterwards, 
+# 1. open emacs
+# 2. install cider package (M-x package-install cider)
+# 3. update packages (M-x list-package U x y)
+# See also https://github.com/flyingmachine/emacs-for-clojure/issues/43
