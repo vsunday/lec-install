@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+  SSHLocation:
+    Type: String
+    AllowedPattern: \d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}/\d{1,2}
+    Description: Ip address that is allowed to connect to instance
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  VpcId:
+    Type: String
+    Default: ""
+    Description: If VpcId is not specified, the instance will be created in default VPC
+  SubnetId:
+    Type: String
+    Default: ""
+    Description: If SubnetId is not specified, the instance will be created in default Subnet
+    
+Conditions:
+  IsDefaultVpc:
+    Fn::Equals:
+      - Ref: VpcId
+      - ""
+  IsDefaultSubnet:
+    Fn::Equals:
+      - Ref: SubnetId
+      - ""
+
+Resources:
+  LeinInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: LatestAmiId
+      InstanceType: t2.micro
+      KeyName:
+        Ref: KeyPair
+      SecurityGroupIds:
+        - Ref: LeinSecurityGroup
+      SubnetId:
+        Fn::If:
+          - IsDefaultSubnet
+          - Ref: AWS::NoValue
+          - Ref: SubnetId
+      Tags:
+        - Key: Name
+          Value: lein-instance
+        - Key: pjt
+          Value: lein
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash -x
+          wget -O install.sh https://raw.githubusercontent.com/vsunday/lec-install/master/scripts/clojure_install_amazonlinux
+          source install.sh
+        
+  LeinSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for leiningen instance
+      GroupName: lein-sg
+      SecurityGroupIngress:
+        - Description: Allow SSH to instance
+          CidrIp:
+            Ref: SSHLocation
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value: lein-sg
+        - Key: pjt
+          Value: lein
+      VpcId:
+        Fn::If:
+          - IsDefaultVpc
+          - Ref: AWS::NoValue
+          - Ref: VpcId
