@@ -32,7 +32,53 @@ Conditions:
 Resources:
   LeinInstance:
     Type: AWS::EC2::Instance
+    Metadata: 
+      AWS::CloudFormation::Init:
+        config: 
+          packages: 
+            yum:
+              java-1.8.0-openjdk: []
+              emacs: []
+              git: []
+              tmux: []
+          sources: 
+            /home/ec2-user/.emacs.d: https://github.com/flyingmachine/emacs-for-clojure/tarball/master
+          files:
+            /home/ec2-user/bin/lein:
+              source: https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content:
+                Fn::Sub: |
+                  [cfn-auto-reloader-hook]
+                  triggers=post.update
+                  path=Resources.LeinInstance.Metadata.AWS::CloudFormation::Init
+                  action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LeinInstance --region ${AWS::Region}
+                  runas=root
+              mode: "000400"
+              owner: root
+              group: root
+          commands: 
+            01_leiningen:
+              command: >-
+                echo $LEIN &&
+                chown ec2-user:ec2-user $LEIN &&
+                chmod a+x $LEIN
+              env:
+                LEIN: /home/ec2-user/bin/lein
+            02_emacs:
+              command: >-
+                chown ec2-user:ec2-user -R /home/ec2-user/.emacs.d
+              cwd: /home/ec2-user
+            03_makeswap:
+              command: >-
+                sudo dd if=/dev/zero of=/swapfile bs=128M count=8 &&
+                sudo chmod 600 /swapfile &&
+                sudo mkswap /swapfile &&
+                sudo swapon /swapfile &&
+                echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
     Properties:
+      IamInstanceProfile:
+        Ref: LeinInstanceProfile
       ImageId:
         Ref: LatestAmiId
       InstanceType: t3.micro
@@ -51,10 +97,11 @@ Resources:
         - Key: pjt
           Value: lein
       UserData:
-        Fn::Base64: |
-          #!/bin/bash -x
-          wget -O install.sh https://raw.githubusercontent.com/vsunday/lec-install/master/scripts/clojure_install_amazonlinux
-          source install.sh
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash -x
+            yum -y update
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LeinInstance --region ${AWS::Region}
         
   LeinSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -78,3 +125,25 @@ Resources:
           - IsDefaultVpc
           - Ref: AWS::NoValue
           - Ref: VpcId
+
+  LeinInstanceProfile: 
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Path: /
+      Roles: 
+        - Ref: LeinInstanceRole
+        
+  LeinInstanceRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Path: /
